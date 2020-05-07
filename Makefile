@@ -8,7 +8,7 @@
 #Makefile for hw11
 ###########
 
-CC=gcc
+CC=gcc -pthread
 CFLAGS=-ggdb -Wall -Wno-unused-function 
 
 .PHONY: clean
