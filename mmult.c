@@ -17,6 +17,8 @@ void noThreadMulti(char* file1, char* file2, char* ofile);
 void threadMulti(char* file1, char* file2, char* ofile, int threads);
 void* calculate(void* x);
 
+pthread_mutex_t lock;
+
 struct arg_struct{
     int i;
     int j;
@@ -124,6 +126,7 @@ void threadMulti(char* file1, char* file2, char* ofile, int threads){
     int f1col = -1;
     int f2row = -1;
     int f2col = -1;
+    pthread_attr_t attr;
     pthread_t thread_list[threads];
 
     if((f1 = fopen(file1, "r"))){
@@ -156,21 +159,30 @@ void threadMulti(char* file1, char* file2, char* ofile, int threads){
     fwrite(&f2col, 1, sizeof(int), outf);
     for(int i = 0; i < f1row; i++){
         for(int j = 0; j < f2col; j++){
-            void* entry;
-            for(int l = 0; l < threads; l++){
+            pthread_mutex_init(&lock, NULL);
+            pthread_attr_init(&attr);
+            pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+            int splitThreads;
+            if((f2col - j)<threads){splitThreads = f2col-j;}
+            else{splitThreads = threads;}
+            for(int l = 0; l < splitThreads; l++){
+                pthread_mutex_lock(&lock);
                 struct arg_struct args;
                 args.i = i;
-                args.j = j;
+                args.j = j+l;
                 args.file1 = file1;
                 args.file2 = file2;
                 args.f1col = f1col;
                 args.f2col = f2col;
                 pthread_create(&thread_list[l], NULL,calculate,&args);
             }
-            for(int l = 0; l < threads; l++){
+            pthread_attr_destroy(&attr);
+            for(int l = 0; l < splitThreads; l++){
+                void* entry;
                 pthread_join(thread_list[l],&entry);
                 fwrite(entry, 1, sizeof(double), outf);
             }
+            j = j + threads - 1;
         }
     }
     printf("\nMatrix sizes:\n");
@@ -193,6 +205,7 @@ void* calculate(void* x){
     FILE* f2;
     f1 = fopen(file1, "r");
     f2 = fopen(file2, "r");
+    pthread_mutex_unlock(&lock);
     double entry = 0;
     for(int k = 0; k < args->f1col; k++){
         int f1Off = (i*f1col + k)*8 + 8;
